@@ -17,7 +17,7 @@ import argparse
 import os
 import sys
 import networkx as nx
-import matplotlib
+import matplotlib.pyplot as plt
 from operator import itemgetter
 import random
 random.seed(9001)
@@ -85,15 +85,22 @@ def build_kmer_dict(fastq_file, kmer_size):
     seq_list = read_fastq(fastq_file)
     for seq in seq_list : 
         kmer_list = kmer_list + (list(cut_kmer(seq, kmer_size)))
-    print(kmer_list)
     for kmer in set(kmer_list):
         kmer_dict[kmer] = kmer_list.count(kmer)
-    print(kmer_dict)
     return kmer_dict
 
 
 def build_graph(kmer_dict):
-    return 1
+    G = nx.DiGraph()
+    for kmer in kmer_dict:
+        prefix = kmer[:-1]
+        suffix = kmer[1:]
+        G.add_nodes_from(prefix)
+        G.add_nodes_from(suffix)
+        G.add_edge(prefix, suffix, weight = kmer_dict[kmer])
+    nx.draw(G, with_labels = True)
+    plt.show()
+    return G
 
 
 #==============================================================
@@ -111,6 +118,7 @@ def main():
     kmer_dict = build_kmer_dict(args.fastq_file, args.kmer_size)
 
     # 1.b. Construction de l'arbre de Bruijn
+    graph = build_graph(kmer_dict)
 
 
 if __name__ == '__main__':
