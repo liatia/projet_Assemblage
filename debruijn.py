@@ -91,16 +91,60 @@ def build_kmer_dict(fastq_file, kmer_size):
 
 
 def build_graph(kmer_dict):
-    G = nx.DiGraph()
+    graph = nx.DiGraph()
     for kmer in kmer_dict:
         prefix = kmer[:-1]
         suffix = kmer[1:]
-        G.add_nodes_from(prefix)
-        G.add_nodes_from(suffix)
-        G.add_edge(prefix, suffix, weight = kmer_dict[kmer])
-    nx.draw(G, with_labels = True)
-    plt.show()
-    return G
+        graph.add_node(prefix)
+        graph.add_node(suffix)
+        graph.add_edge(prefix, suffix, weight = kmer_dict[kmer])
+    # nx.draw(graph, with_labels = True)
+    # plt.show()
+    return graph
+
+
+def get_starting_nodes(graph):
+    nodes_list_in = []
+    for node in graph.nodes:
+        if list(graph.predecessors(node)) == []: 
+            nodes_list_in.append(node)
+    return nodes_list_in
+
+
+def get_sink_nodes(graph):
+    nodes_list_out = []
+    for node in graph.nodes:
+        if list(graph.successors(node)) == []:
+            nodes_list_out.append(node)
+    return nodes_list_out
+
+
+def get_contigs(graph, nodes_list_in, nodes_list_out):
+    list_contigs = []
+    for node_in in nodes_list_in: 
+        for node_out in nodes_list_out:
+            for paths in nx.all_simple_paths(graph, source=node_in, target=node_out):
+                contig = paths[0] 
+                for path in paths[1:]:
+                    contig = contig + path[-1]
+                list_contigs.append((contig, len(contig)))
+    print(list_contigs)
+    return list_contigs
+
+
+def fill(text, width=80):    
+    """Split text with a line return to respect fasta format"""    
+    return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
+
+
+def save_contigs(list_contigs, output_file):
+    # écrit un fichier de sortie contenant les contigs selon le format fasta 
+    # (retour chariot tous les 80 charactères) à l’aide de la fonction fill
+    with open(output_file, "w") as filout:
+        for i, contig in enumerate(list_contigs):
+            filout.write(">" + str(i) + " len=" + str(contig[1]) + "\n")
+            print(fill(contig[0]))
+            filout.write(fill(contig[0])+"\n")
 
 
 #==============================================================
@@ -119,6 +163,16 @@ def main():
 
     # 1.b. Construction de l'arbre de Bruijn
     graph = build_graph(kmer_dict)
+
+    # 2. Parcours du graphe de de Bruijn
+    nodes_list_in = get_starting_nodes(graph)
+    nodes_list_out = get_sink_nodes(graph)
+    list_contigs = get_contigs(graph, nodes_list_in, nodes_list_out)
+    save_contigs(list_contigs, args.output_file)
+
+    # 3. Simplification du graphe de de Bruijn
+    # 3.a. Résolution des bulles
+
 
 
 if __name__ == '__main__':
