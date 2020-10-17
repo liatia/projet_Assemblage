@@ -21,7 +21,7 @@ from operator import itemgetter
 import random
 from random import randint
 import networkx as nx
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 random.seed(9001)
 
 __author__ = "Lara Herrmann"
@@ -151,7 +151,6 @@ def get_contigs(graph, nodes_list_in, nodes_list_out):
                 for path in paths[1:]:
                     contig = contig + path[-1]
                 list_contigs.append((contig, len(contig)))
-    print(list_contigs)
     return list_contigs
 
 
@@ -165,8 +164,7 @@ def save_contigs(list_contigs, output_file):
     """
     with open(output_file, "w") as filout:
         for i, contig in enumerate(list_contigs):
-            filout.write(">contg" + str(i) + " len=" + str(contig[1]) + "\n")
-            print(fill(contig[0]))
+            filout.write(">contig_" + str(i) + " len=" + str(contig[1]) + "\n")
             filout.write(fill(contig[0])+"\n")
 
 
@@ -180,9 +178,9 @@ def path_average_weight(graph, path):
     """ Calcul d'un poids moyen dans un graph
     """
     weight_list = []
-    for indice_node in range(len(path)-1):
-        weight_list.append(graph.get_edge_data(path[indice_node], 
-            path[indice_node+1])['weight'])
+    for i in range(len(path)-1):
+        weight_list.append(graph.get_edge_data(path[i], 
+            path[i+1])['weight'])
     return statistics.mean(weight_list)
 
 
@@ -216,6 +214,42 @@ def select_best_path(graph, path_list, path_size_list, average_weight_list,
     return graph
 
 
+def solve_bubble(graph, ancetre, descendant):
+    paths = list(nx.all_simple_paths(graph, source=ancetre, target=descendant))
+    while(len(paths) >= 2):
+        path_size_list = [len(paths[0]), len(paths[1])]
+        average_weight_list = [path_average_weight(graph, paths[0]), path_average_weight(graph, paths[1])]
+        graph = select_best_path(graph, paths, path_size_list, average_weight_list)
+        paths = list(nx.all_simple_paths(graph, ancetre, descendant))
+    return graph
+
+
+def simplify_bubbles(graph):
+    flag_anc = 0
+    flag_des = 0
+    nodes_list_in = get_starting_nodes(graph)
+    nodes_list_out = get_sink_nodes(graph)
+    for node_in in nodes_list_in:
+        for node_out in nodes_list_out:
+            paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
+            while len(paths) > 1:
+                for i in range(len(paths[0])):
+                    if paths[0][i] != paths[1][i] and flag_anc == 0:
+                        ancetre = paths[0][i-1]
+                        flag_anc = 1
+                    if paths[0][len(paths[0])-1-i] != paths[1][len(paths[1])-1-i] and flag_des == 0:
+                        descendant = paths[0][-i]
+                        flag_des = 1
+                graph = solve_bubble(graph, ancetre, descendant)
+                paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
+    return graph
+
+def solve_entry_tips():
+    pass
+
+def solve_out_tips():
+    pass
+
 #==============================================================
 # Main program
 #==============================================================
@@ -241,9 +275,18 @@ def main():
 
     # 3. Simplification du graphe de de Bruijn
     # 3.a. Résolution des bulles
-    path_average_weight(graph, path)
-    remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    graph_1 = nx.DiGraph()
+    graph_1.add_weighted_edges_from([(3, 2, 10), (2, 4, 15), (4, 5, 15),
+                                     (2, 10,10), (10, 5,10), (2, 8, 3),
+                                     (8, 9, 3), (9, 5, 3), (5, 6, 10),
+                                     (5, 7, 10)])
+    graph_1 = simplify_bubbles(graph_1)
+    assert (2,8) not in graph_1.edges()
+    assert (8,9) not in graph_1.edges()
+    assert (9,5) not in graph_1.edges()
+    assert (2,10) not in graph_1.edges()
+    assert (10, 5) not in graph_1.edges()
