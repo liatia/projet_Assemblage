@@ -16,13 +16,13 @@
 import argparse
 import os
 import sys
-import networkx as nx
-import matplotlib.pyplot as plt
+import statistics
 from operator import itemgetter
 import random
-random.seed(9001)
 from random import randint
-import statistics
+import networkx as nx
+import matplotlib.pyplot as plt
+random.seed(9001)
 
 __author__ = "Lara Herrmann"
 __copyright__ = "Universite Paris Diderot"
@@ -67,23 +67,33 @@ def get_arguments():
 
 
 def read_fastq(fastq_file):
+    """ Lecture du fichier fastq en entree
+        Retourne : les sequences d'acides nucleiques
+    """
     with open(fastq_file) as filin:
         for line in enumerate(filin):
             yield next(filin)[:-1]
-            next(filin)       
+            next(filin)
             next(filin)
 
 
 def cut_kmer(seq, kmer_size):
+    """ Coupe les sequences en kmers
+        Retourne : tous les kmers trouves dans les sequences
+    """
     for i in range(len(seq) - kmer_size + 1):
         yield seq[i:i + kmer_size]
 
 
 def build_kmer_dict(fastq_file, kmer_size):
+    """ Contruction d'un dict de kmers
+        Retourne : un dictionnaire avec cle : kmer et valeur : le nombre
+        d'occurence du kmer
+    """
     kmer_dict = {}
     kmer_list = []
     seq_list = read_fastq(fastq_file)
-    for seq in seq_list : 
+    for seq in seq_list:
         kmer_list = kmer_list + (list(cut_kmer(seq, kmer_size)))
     for kmer in set(kmer_list):
         kmer_dict[kmer] = kmer_list.count(kmer)
@@ -91,6 +101,10 @@ def build_kmer_dict(fastq_file, kmer_size):
 
 
 def build_graph(kmer_dict):
+    """Creation d'un graph a partir des kmers
+    Les noeuds correspondent aux prefix et au suffix des kmers
+        Retourne : un graph
+    """
     graph = nx.DiGraph()
     for kmer in kmer_dict:
         prefix = kmer[:-1]
@@ -104,14 +118,20 @@ def build_graph(kmer_dict):
 
 
 def get_starting_nodes(graph):
+    """Obtention de noeuds d'entree sans predecesseurs
+        Retourne : une liste de noeuds d'entree
+    """
     nodes_list_in = []
     for node in graph.nodes:
-        if list(graph.predecessors(node)) == []: 
+        if list(graph.predecessors(node)) == []:
             nodes_list_in.append(node)
     return nodes_list_in
 
 
 def get_sink_nodes(graph):
+    """Obtention de noeuds de sortie sans successeurs
+        Retourne : une liste de noeuds de sortie
+    """
     nodes_list_out = []
     for node in graph.nodes:
         if list(graph.successors(node)) == []:
@@ -120,11 +140,14 @@ def get_sink_nodes(graph):
 
 
 def get_contigs(graph, nodes_list_in, nodes_list_out):
+    """Creation d'une liste de contigs en concatenant les kmers d'un chemin
+        Retourne d'une lite de tuple(contig, longueur du contig)
+    """
     list_contigs = []
-    for node_in in nodes_list_in: 
+    for node_in in nodes_list_in:
         for node_out in nodes_list_out:
             for paths in nx.all_simple_paths(graph, source=node_in, target=node_out):
-                contig = paths[0] 
+                contig = paths[0]
                 for path in paths[1:]:
                     contig = contig + path[-1]
                 list_contigs.append((contig, len(contig)))
@@ -132,19 +155,65 @@ def get_contigs(graph, nodes_list_in, nodes_list_out):
     return list_contigs
 
 
-def fill(text, width=80):    
-    """Split text with a line return to respect fasta format"""    
+def fill(text, width=80):
+    """Split text with a line return to respect fasta format"""
     return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
 
 
 def save_contigs(list_contigs, output_file):
-    # écrit un fichier de sortie contenant les contigs selon le format fasta 
-    # (retour chariot tous les 80 charactères) à l’aide de la fonction fill
+    """ Ecrit un fichier de sortie contenant les contigs selon le format fasta
+    """
     with open(output_file, "w") as filout:
         for i, contig in enumerate(list_contigs):
-            filout.write(">" + str(i) + " len=" + str(contig[1]) + "\n")
+            filout.write(">contg" + str(i) + " len=" + str(contig[1]) + "\n")
             print(fill(contig[0]))
             filout.write(fill(contig[0])+"\n")
+
+
+def std(val_list):
+    """ Calcul de la variance
+    """
+    return statistics.stdev(val_list)
+
+
+def path_average_weight(graph, path):
+    """ Calcul d'un poids moyen dans un graph
+    """
+    weight_list = []
+    for indice_node in range(len(path)-1):
+        weight_list.append(graph.get_edge_data(path[indice_node], 
+            path[indice_node+1])['weight'])
+    return statistics.mean(weight_list)
+
+
+def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
+    """ Detection des chemins indesirables et des noeuds a supprimer 
+    """
+    for path in path_list:
+        for i in range(len(path)):
+            if (i == 0 and delete_entry_node == False) or (i == len(path)-1 and delete_sink_node == False):
+                continue
+            graph.remove_node(path[i])
+    return graph
+
+
+def select_best_path(graph, path_list, path_size_list, average_weight_list, 
+    delete_entry_node = False, delete_sink_node = False):
+    """ Selection du meilleur chemin 
+    """
+    if average_weight_list[0] > average_weight_list[1]:
+        remove_paths(graph, [path_list[1]], delete_entry_node, delete_sink_node)
+    elif average_weight_list[0] < average_weight_list[1]:
+        remove_paths(graph, [path_list[0]], delete_entry_node, delete_sink_node)
+    else:
+        if path_size_list[0] > path_size_list[1]:
+            remove_paths(graph, [path_list[1]], delete_entry_node, delete_sink_node)
+        elif path_size_list[0] < path_size_list[1]:
+            remove_paths(graph, [path_list[0]], delete_entry_node, delete_sink_node)
+        else:
+            remove_paths(graph, [path_list[random.randint(0,1)]], delete_entry_node, 
+                delete_sink_node)
+    return graph
 
 
 #==============================================================
@@ -172,9 +241,9 @@ def main():
 
     # 3. Simplification du graphe de de Bruijn
     # 3.a. Résolution des bulles
-
+    path_average_weight(graph, path)
+    remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
 
 
 if __name__ == '__main__':
     main()
-
