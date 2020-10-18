@@ -17,11 +17,11 @@ import argparse
 import os
 import sys
 import statistics
-from operator import itemgetter
+# from operator import itemgetter
 import random
-from random import randint
+# from random import randint
 import networkx as nx
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 random.seed(9001)
 
 __author__ = "Lara Herrmann"
@@ -214,6 +214,8 @@ def select_best_path(graph, path_list, path_size_list, average_weight_list,
 
 
 def solve_bubble(graph, ancetre, descendant):
+    """ Supression d'une bulle
+    """
     paths = list(nx.all_simple_paths(graph, source=ancetre, target=descendant))
     while len(paths) >= 2:
         path_size_list = [len(paths[0]), len(paths[1])]
@@ -225,37 +227,37 @@ def solve_bubble(graph, ancetre, descendant):
 
 
 def simplify_bubbles(graph):
+    """ Nettoyage d'un graph et suppression de bulles
+    """
     flag_anc = 0
     flag_des = 0
-    ancetre_list = []
-    descendant_list = []
     nodes_list_in = get_starting_nodes(graph)
     nodes_list_out = get_sink_nodes(graph)
+    print(nodes_list_in)
     for node_in in nodes_list_in:
         for node_out in nodes_list_out:
             paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
             while len(paths) > 1:
-                for i in range(len(paths[0])):
-                    if paths[0][i] != paths[1][i] and flag_anc == 0:
-                        ancetre_list.append(paths[0][i-1])
-                        flag_anc = 1
-                    elif paths[0][i] == paths[1][i] and flag_anc == 1:
-                        flag_anc = 0
-                    if paths[0][len(paths[0])-1-i] != paths[1][len(paths[1])-1-i] and flag_des == 0:
-                        descendant_list.append(paths[0][-i])
-                        flag_des = 1
-                    elif paths[0][len(paths[0])-1-i] == paths[1][len(paths[1])-1-i] and flag_des == 1:
-                        flag_des = 0
-                if len(ancetre_list) == 1 and len(descendant_list) == 1:
-                    graph = solve_bubble(graph, ancetre_list[0], descendant_list[0])
-                else :
-                    for j in range(len(ancetre_list)):
-                        graph = solve_bubble(graph, ancetre_list[j], descendant_list[len(descendant_list)-1-j])
+                for i, node in enumerate(paths[0]):
+                    if not node in paths[1]:
+                        ancetre = paths[0][i - 1]
+                        break
+                for node in paths[0][paths[0].index(ancetre)+1:]:
+                    if node in paths[1]:
+                        descendant = node
+                        break
+                print(ancetre, descendant)
+                graph = solve_bubble(graph, ancetre, descendant)
                 paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
+                print(len(paths))
     return graph
 
 
 def solve_entry_tips(graph, nodes_list_in):
+    """ Suppression des pointes en entree
+    """
+    if len(nodes_list_in) < 2:
+        return graph
     entry_list = []
     nb_successors = -1
     actual_node = list(graph.successors(nodes_list_in[0]))[0]
@@ -265,22 +267,32 @@ def solve_entry_tips(graph, nodes_list_in):
             entry_list.append(actual_node)
         actual_node = list(graph.successors(actual_node))[0]
         nb_successors = len(list(graph.successors(actual_node)))
-    last_entry_node = entry_list[-1]
-    print(last_entry_node)
+    if len(entry_list) == 0:
+        return graph
+    if len(entry_list) == 1:
+        last_in_node = entry_list[0]
+    else :
+        last_in_node = entry_list[-1]
     while len(nodes_list_in) != 1:
-        path0 = list(nx.all_simple_paths(graph, source=nodes_list_in[0], target=last_entry_node))[0]
-        path1 = list(nx.all_simple_paths(graph, source=nodes_list_in[1], target=last_entry_node))[0]
+        path0 = list(nx.all_simple_paths(graph, source=nodes_list_in[0], 
+                     target=last_in_node))[0]
+        path1 = list(nx.all_simple_paths(graph, source=nodes_list_in[1], 
+                     target=last_in_node))[0]
         path_list = [path0, path1]
         path_size_list = [len(path0), len(path1)]
-        average_weight_list = [path_average_weight(graph, path0), path_average_weight(graph, path1)]
-        graph = select_best_path(graph, path_list, path_size_list, average_weight_list, True, False)
+        average_weight_list = [path_average_weight(graph, path0), 
+                               path_average_weight(graph, path1)]
+        graph = select_best_path(graph, path_list, path_size_list, 
+                                 average_weight_list, True, False)
         nodes_list_in = get_starting_nodes(graph)
     return graph
 
 
 def solve_out_tips(graph, nodes_list_out):
-    # nx.draw(graph, with_labels = True)
-    # plt.show()
+    """ Supression des pointes de sortie
+    """
+    if len(nodes_list_out) < 2:
+        return graph
     out_list = []
     nb_predecesseurs = -1
     actual_node = list(graph.predecessors(nodes_list_out[0]))[0]
@@ -290,16 +302,27 @@ def solve_out_tips(graph, nodes_list_out):
             out_list.append(actual_node)
         actual_node = list(graph.predecessors(actual_node))[0]
         nb_predecesseurs = len(list(graph.predecessors(actual_node)))
-    last_out_node = out_list[-1]
+    if len(out_list) == 0:
+        return graph
+    if len(out_list) == 1:
+        last_out_node = out_list[0]
+    else :
+        last_out_node = out_list[-1]
     while len(nodes_list_out) != 1:
-        path0 = list(nx.all_simple_paths(graph, source=last_out_node, target=nodes_list_out[0]))[0]
-        path1 = list(nx.all_simple_paths(graph, source=last_out_node, target=nodes_list_out[1]))[0]
+        print(last_out_node)
+        path0 = list(nx.all_simple_paths(graph, source=last_out_node, 
+                                         target=nodes_list_out[0]))[0]
+        path1 = list(nx.all_simple_paths(graph, source=last_out_node, 
+                                         target=nodes_list_out[1]))[0]
         path_list = [path0, path1]
         path_size_list = [len(path0), len(path1)]
-        average_weight_list = [path_average_weight(graph, path0), path_average_weight(graph, path1)]
-        graph = select_best_path(graph, path_list, path_size_list, average_weight_list, False, True)
+        average_weight_list = [path_average_weight(graph, path0), 
+                               path_average_weight(graph, path1)]
+        graph = select_best_path(graph, path_list, path_size_list, 
+                                 average_weight_list, False, True)
         nodes_list_out = get_starting_nodes(graph)
     return graph
+
 
 #==============================================================
 # Main program
@@ -311,22 +334,24 @@ def main():
     # Get arguments
     args = get_arguments()
 
-    # 1. Création du graphe de Bruijn
-    # 1.a. Identification des k-mer uniques
+    # 1. Lecture du fichier et construction du graphe
     kmer_dict = build_kmer_dict(args.fastq_file, args.kmer_size)
-
-    # 1.b. Construction de l'arbre de Bruijn
     graph = build_graph(kmer_dict)
+    nodes_list_in = get_starting_nodes(graph)
+    nodes_list_out = get_sink_nodes(graph)
 
-    # 2. Parcours du graphe de de Bruijn
+    # 2. Résolution des bulles
+    graph = simplify_bubbles(graph)
+
+    # 3. Résolution des pointes d’entrée et de sortie
+    graph = solve_entry_tips(graph, nodes_list_in)
+    graph = solve_out_tips(graph, nodes_list_out)
+
+    # 4. Ecriture du/des contigs
     nodes_list_in = get_starting_nodes(graph)
     nodes_list_out = get_sink_nodes(graph)
     list_contigs = get_contigs(graph, nodes_list_in, nodes_list_out)
     save_contigs(list_contigs, args.output_file)
-
-    # 3. Simplification du graphe de de Bruijn
-    # 3.a. Résolution des bulles
-    # 3.b. Detection des pointes
 
 
 if __name__ == '__main__':
