@@ -186,11 +186,11 @@ def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
     """ Detection des chemins indesirables et des noeuds a supprimer
     """
     for path in path_list:
-        for i in range(len(path)):
-            if (i == 0 and delete_entry_node == False) or \
-            (i == len(path)-1 and delete_sink_node == False):
+        for enum in enumerate(path):
+            if (enum[0] == 0 and not delete_entry_node) or \
+            (enum[0] == len(path)-1 and not delete_sink_node):
                 continue
-            graph.remove_node(path[i])
+            graph.remove_node(path[enum[0]])
     return graph
 
 
@@ -229,11 +229,8 @@ def solve_bubble(graph, ancetre, descendant):
 def simplify_bubbles(graph):
     """ Nettoyage d'un graph et suppression de bulles
     """
-    flag_anc = 0
-    flag_des = 0
     nodes_list_in = get_starting_nodes(graph)
     nodes_list_out = get_sink_nodes(graph)
-    print(nodes_list_in)
     for node_in in nodes_list_in:
         for node_out in nodes_list_out:
             paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
@@ -246,10 +243,8 @@ def simplify_bubbles(graph):
                     if node in paths[1]:
                         descendant = node
                         break
-                print(ancetre, descendant)
                 graph = solve_bubble(graph, ancetre, descendant)
                 paths = list(nx.all_simple_paths(graph, source=node_in, target=node_out))
-                print(len(paths))
     return graph
 
 
@@ -274,15 +269,15 @@ def solve_entry_tips(graph, nodes_list_in):
     else :
         last_in_node = entry_list[-1]
     while len(nodes_list_in) != 1:
-        path0 = list(nx.all_simple_paths(graph, source=nodes_list_in[0], 
+        path0 = list(nx.all_simple_paths(graph, source=nodes_list_in[0],
                      target=last_in_node))[0]
-        path1 = list(nx.all_simple_paths(graph, source=nodes_list_in[1], 
+        path1 = list(nx.all_simple_paths(graph, source=nodes_list_in[1],
                      target=last_in_node))[0]
         path_list = [path0, path1]
         path_size_list = [len(path0), len(path1)]
-        average_weight_list = [path_average_weight(graph, path0), 
+        average_weight_list = [path_average_weight(graph, path0),
                                path_average_weight(graph, path1)]
-        graph = select_best_path(graph, path_list, path_size_list, 
+        graph = select_best_path(graph, path_list, path_size_list,
                                  average_weight_list, True, False)
         nodes_list_in = get_starting_nodes(graph)
     return graph
@@ -309,16 +304,15 @@ def solve_out_tips(graph, nodes_list_out):
     else :
         last_out_node = out_list[-1]
     while len(nodes_list_out) != 1:
-        print(last_out_node)
-        path0 = list(nx.all_simple_paths(graph, source=last_out_node, 
+        path0 = list(nx.all_simple_paths(graph, source=last_out_node,
                                          target=nodes_list_out[0]))[0]
-        path1 = list(nx.all_simple_paths(graph, source=last_out_node, 
+        path1 = list(nx.all_simple_paths(graph, source=last_out_node,
                                          target=nodes_list_out[1]))[0]
         path_list = [path0, path1]
         path_size_list = [len(path0), len(path1)]
-        average_weight_list = [path_average_weight(graph, path0), 
+        average_weight_list = [path_average_weight(graph, path0),
                                path_average_weight(graph, path1)]
-        graph = select_best_path(graph, path_list, path_size_list, 
+        graph = select_best_path(graph, path_list, path_size_list,
                                  average_weight_list, False, True)
         nodes_list_out = get_starting_nodes(graph)
     return graph
